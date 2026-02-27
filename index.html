@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ice Fishing Booking Heatmap</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;600;700&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --text: #e0e0e8;
+    --text-dim: #6a6a80;
+    --accent: #5ec4e6;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .header {
+    padding: 40px 48px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #5ec4e6, #a8e0f0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .header p {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-top: 6px;
+    font-weight: 300;
+  }
+
+  .upload-zone {
+    margin: 32px 48px;
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 48px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: var(--surface);
+  }
+
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(255, 107, 53, 0.03);
+  }
+
+  .upload-zone svg {
+    width: 40px; height: 40px;
+    stroke: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  .upload-zone .label {
+    font-size: 15px;
+    color: var(--text-dim);
+  }
+
+  .upload-zone .label span {
+    color: var(--accent);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  #fileInput { display: none; }
+
+  .container {
+    padding: 24px 48px 64px;
+  }
+
+  .stats-bar {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 24px;
+    min-width: 140px;
+  }
+
+  .stat-card .val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .stat-card .lbl {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .heatmap-wrapper {
+    position: relative;
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  canvas { display: block; }
+
+  .tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: #1a1a28;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.15s;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    line-height: 1.6;
+  }
+
+  .tooltip.show { opacity: 1; }
+
+  .legend {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .legend-bar {
+    width: 200px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+
+  .controls label {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .controls select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .reupload-btn {
+    background: var(--bg);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .reupload-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .controls-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+  }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🎣 Ice Fishing Booking Heatmap</h1>
+  <p>Upload your timeslots CSV to visualize booking density across days and times</p>
+</div>
+
+<div class="upload-zone" id="dropZone">
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+  </svg>
+  <div class="label">Drop your <span>timeslots.csv</span> here or click to browse</div>
+  <input type="file" id="fileInput" accept=".csv">
+</div>
+
+<div class="container hidden" id="vizSection">
+  <div class="stats-bar" id="statsBar"></div>
+  <div class="controls">
+    <button id="reuploadBtn" class="reupload-btn">📂 Upload New CSV</button>
+    <div class="controls-sep"></div>
+    <label>Color scheme:</label>
+    <select id="colorScheme">
+      <option value="frost">❄️ Frost</option>
+      <option value="aurora">🌌 Aurora</option>
+      <option value="blizzard">🌨️ Blizzard</option>
+    </select>
+    <label style="margin-left:12px">Resolution:</label>
+    <select id="resolution">
+      <option value="15">15 min</option>
+      <option value="30" selected>30 min</option>
+    </select>
+  </div>
+  <div class="heatmap-wrapper">
+    <canvas id="heatmap"></canvas>
+  </div>
+  <div class="legend">
+    <span>Less booked</span>
+    <canvas id="legendBar" class="legend-bar" width="200" height="12"></canvas>
+    <span>More booked</span>
+    <span style="margin-left:12px" id="maxLabel"></span>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ─── Color Palettes ───
+const palettes = {
+  frost: (t) => {
+    // 深蓝 → 冰蓝 → 亮白
+    if (t === 0) return [8, 12, 20, 0];
+    const r = Math.floor(20 + t * t * 200);
+    const g = Math.min(255, Math.floor(40 + t * 215));
+    const b = Math.min(255, Math.floor(80 + t * 175));
+    return [r, g, b, 0.15 + t * 0.85];
+  },
+  aurora: (t) => {
+    // 深蓝 → 青绿 → 极光绿
+    if (t === 0) return [8, 12, 20, 0];
+    const r = Math.floor(t * t * 60);
+    const g = Math.min(255, Math.floor(30 + t * 225));
+    const b = Math.min(255, Math.floor(100 + (1 - t) * 80 + t * 120));
+    return [r, g, b, 0.15 + t * 0.85];
+  },
+  blizzard: (t) => {
+    // 深靛 → 冰紫 → 白霜
+    if (t === 0) return [8, 12, 20, 0];
+    const r = Math.min(240, Math.floor(40 + t * 200));
+    const g = Math.min(240, Math.floor(50 + t * t * 190));
+    const b = Math.min(255, Math.floor(120 + t * 135));
+    return [r, g, b, 0.15 + t * 0.85];
+  }
+};
+
+// ─── State ───
+let parsedData = null;
+let heatmapData = null;
+
+// ─── Upload Handling ───
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+function handleFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    parsedData = parseCSV(e.target.result);
+    processAndRender();
+    dropZone.classList.add('hidden');
+    document.getElementById('vizSection').classList.remove('hidden');
+  };
+  reader.readAsText(file);
+}
+
+// ─── CSV Parser ───
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = lines[i].split(',').map(v => v.trim());
+    if (vals.length < headers.length) continue;
+    const row = {};
+    headers.forEach((h, j) => row[h] = vals[j]);
+    rows.push(row);
+  }
+  return { headers, rows };
+}
+
+// ─── Process Data ───
+function processData(rows, resMins) {
+  // Determine date from either 'date' column or start_date unix timestamp
+  function getDate(row) {
+    if (row.date && row.date.match(/^\d{4}-\d{2}-\d{2}$/)) return row.date;
+    const ts = parseInt(row.start_date);
+    if (!isNaN(ts) && ts > 1e9) {
+      const d = new Date(ts * 1000);
+      return d.toISOString().slice(0, 10);
+    }
+    return null;
+  }
+
+  // Parse time like "14:00" or "24:00" or "00:30" (next day edge)
+  function parseTime(t) {
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+  }
+
+  // Collect all dates and find time range
+  let minTime = Infinity, maxTime = -Infinity;
+  const dateSet = new Set();
+
+  const entries = [];
+  for (const row of rows) {
+    const date = getDate(row);
+    if (!date) continue;
+    if (!row.start_time || !row.end_time) continue;
+
+    let st = parseTime(row.start_time);
+    let et = parseTime(row.end_time);
+    // Handle overnight: "20:00" -> "01:00" means end_time < start_time
+    if (et <= st) et += 24 * 60;
+
+    const b = parseFloat(row.B) || 0;
+    if (b === 0) continue;
+
+    entries.push({ date, st, et, b });
+    dateSet.add(date);
+    if (st < minTime) minTime = st;
+    if (et > maxTime) maxTime = et;
+  }
+
+  // Snap to resolution boundaries
+  minTime = Math.floor(minTime / resMins) * resMins;
+  maxTime = Math.ceil(maxTime / resMins) * resMins;
+
+  const numBuckets = Math.ceil((maxTime - minTime) / resMins);
+  const dates = [...dateSet].sort();
+
+  // Build heatmap grid: dates x buckets
+  const grid = {};
+  let globalMax = 0;
+  for (const d of dates) {
+    grid[d] = new Float32Array(numBuckets);
+  }
+
+  for (const { date, st, et, b } of entries) {
+    const arr = grid[date];
+    if (!arr) continue;
+    const startBucket = Math.max(0, Math.floor((st - minTime) / resMins));
+    const endBucket = Math.min(numBuckets, Math.ceil((et - minTime) / resMins));
+    for (let i = startBucket; i < endBucket; i++) {
+      arr[i] += b;
+      if (arr[i] > globalMax) globalMax = arr[i];
+    }
+  }
+
+  return { grid, dates, numBuckets, minTime, maxTime, resMins, globalMax };
+}
+
+// ─── Render ───
+function processAndRender() {
+  const resMins = parseInt(document.getElementById('resolution').value);
+  heatmapData = processData(parsedData.rows, resMins);
+  renderStats();
+  renderHeatmap();
+  renderLegend();
+}
+
+function renderStats() {
+  const { dates, globalMax, numBuckets, grid } = heatmapData;
+  // Find peak
+  let peakDate = '', peakTime = 0, peakVal = 0;
+  for (const d of dates) {
+    const arr = grid[d];
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i] > peakVal) {
+        peakVal = arr[i];
+        peakDate = d;
+        peakTime = i;
+      }
+    }
+  }
+
+  const peakMins = heatmapData.minTime + peakTime * heatmapData.resMins;
+  const peakTimeStr = `${String(Math.floor(peakMins / 60) % 24).padStart(2, '0')}:${String(peakMins % 60).padStart(2, '0')}`;
+
+  document.getElementById('statsBar').innerHTML = `
+    <div class="stat-card"><div class="val">${dates.length}</div><div class="lbl">Days</div></div>
+    <div class="stat-card"><div class="val">${parsedData.rows.length}</div><div class="lbl">Timeslots</div></div>
+    <div class="stat-card"><div class="val">${globalMax}</div><div class="lbl">Peak Bookings</div></div>
+    <div class="stat-card"><div class="val">${peakDate}<br>${peakTimeStr}</div><div class="lbl">Busiest</div></div>
+  `;
+}
+
+function renderHeatmap() {
+  const { grid, dates, numBuckets, minTime, resMins, globalMax } = heatmapData;
+  const canvas = document.getElementById('heatmap');
+  const ctx = canvas.getContext('2d');
+
+  const cellW = 18;
+  const cellH = 22;
+  const labelW = 100;
+  const labelH = 50;
+  const gap = 1;
+
+  const width = labelW + numBuckets * (cellW + gap);
+  const height = labelH + dates.length * (cellH + gap);
+
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+  ctx.scale(dpr, dpr);
+
+  // Clear
+  ctx.fillStyle = '#12121a';
+  ctx.fillRect(0, 0, width, height);
+
+  const scheme = document.getElementById('colorScheme').value;
+  const colorFn = palettes[scheme];
+
+  // Time labels on top
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.fillStyle = '#6a6a80';
+  ctx.textAlign = 'center';
+  for (let i = 0; i < numBuckets; i++) {
+    const mins = minTime + i * resMins;
+    const h = Math.floor(mins / 60) % 24;
+    const m = mins % 60;
+    if (m === 0 && i % (resMins === 15 ? 4 : 2) === 0) {
+      const x = labelW + i * (cellW + gap) + cellW / 2;
+      ctx.save();
+      ctx.translate(x, labelH - 6);
+      ctx.rotate(-Math.PI / 4);
+      ctx.fillText(`${String(h).padStart(2, '0')}:00`, 0, 0);
+      ctx.restore();
+    }
+  }
+
+  // Draw cells
+  for (let di = 0; di < dates.length; di++) {
+    const d = dates[di];
+    const y = labelH + di * (cellH + gap);
+    const arr = grid[d];
+
+    // Date label
+    ctx.fillStyle = '#8a8aa0';
+    ctx.font = '11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'right';
+    // Show as MM-DD + weekday
+    const dateObj = new Date(d + 'T12:00:00');
+    const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()];
+    const label = d.slice(5) + ' ' + weekday;
+    ctx.fillText(label, labelW - 8, y + cellH / 2 + 4);
+
+    for (let bi = 0; bi < numBuckets; bi++) {
+      const x = labelW + bi * (cellW + gap);
+      const val = arr[bi];
+      const t = globalMax > 0 ? val / globalMax : 0;
+      const [r, g, b, a] = colorFn(t);
+
+      if (t === 0) {
+        ctx.fillStyle = '#16161f';
+      } else {
+        ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+      }
+      ctx.fillRect(x, y, cellW, cellH);
+
+      // subtle border for non-zero
+      if (t > 0) {
+        ctx.strokeStyle = `rgba(${r},${g},${b},0.3)`;
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x, y, cellW, cellH);
+      }
+    }
+  }
+
+  // ─── Tooltip ───
+  const tooltip = document.getElementById('tooltip');
+  canvas.onmousemove = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    const bi = Math.floor((mx - labelW) / (cellW + gap));
+    const di = Math.floor((my - labelH) / (cellH + gap));
+
+    if (bi >= 0 && bi < numBuckets && di >= 0 && di < dates.length && mx >= labelW && my >= labelH) {
+      const d = dates[di];
+      const val = grid[d][bi];
+      const mins = minTime + bi * resMins;
+      const minsEnd = mins + resMins;
+      const tStr = `${String(Math.floor(mins/60)%24).padStart(2,'0')}:${String(mins%60).padStart(2,'0')}`;
+      const tEnd = `${String(Math.floor(minsEnd/60)%24).padStart(2,'0')}:${String(minsEnd%60).padStart(2,'0')}`;
+
+      tooltip.innerHTML = `<div><strong>${d}</strong></div><div>${tStr} – ${tEnd}</div><div>Booked: <strong style="color:#5ec4e6">${val}</strong></div>`;
+      tooltip.classList.add('show');
+      tooltip.style.left = (e.clientX + 14) + 'px';
+      tooltip.style.top = (e.clientY - 10) + 'px';
+    } else {
+      tooltip.classList.remove('show');
+    }
+  };
+
+  canvas.onmouseleave = () => tooltip.classList.remove('show');
+}
+
+function renderLegend() {
+  const canvas = document.getElementById('legendBar');
+  const ctx = canvas.getContext('2d');
+  const scheme = document.getElementById('colorScheme').value;
+  const colorFn = palettes[scheme];
+
+  for (let x = 0; x < 200; x++) {
+    const t = x / 199;
+    const [r, g, b] = colorFn(t);
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fillRect(x, 0, 1, 12);
+  }
+
+  document.getElementById('maxLabel').textContent = `max = ${heatmapData.globalMax}`;
+}
+
+// ─── Controls ───
+document.getElementById('colorScheme').addEventListener('change', () => { if (heatmapData) { renderHeatmap(); renderLegend(); } });
+document.getElementById('resolution').addEventListener('change', () => { if (parsedData) processAndRender(); });
+
+// ─── Re-upload button ───
+document.getElementById('reuploadBtn').addEventListener('click', () => {
+  fileInput.value = '';
+  fileInput.click();
+});
+
+// ─── Auto-load CSV from repo ───
+const CSV_URL = './data/timeslots.csv';
+fetch(CSV_URL)
+  .then(r => { if (r.ok) return r.text(); throw new Error('not found'); })
+  .then(text => {
+    parsedData = parseCSV(text);
+    processAndRender();
+    dropZone.classList.add('hidden');
+    document.getElementById('vizSection').classList.remove('hidden');
+  })
+  .catch(() => {}); // CSV not found, wait for manual upload
+</script>
+</body>
+</html>
