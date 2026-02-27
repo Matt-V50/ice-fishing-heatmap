@@ -4,7 +4,7 @@ Interactive heatmap for visualizing ice fishing timeslot bookings. See at a glan
 
 ## Live Demo
 
-👉 https://YOUR_USERNAME.github.io/ice-fishing-heatmap/
+👉 https://Matt-V50.github.io/ice-fishing-heatmap/
 
 ## Usage
 

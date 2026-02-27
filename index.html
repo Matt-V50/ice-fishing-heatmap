@@ -365,8 +365,9 @@ function processData(rows, resMins) {
 
     const b = parseFloat(row.B) || 0;
     if (b === 0) continue;
+    const seat = parseInt(row.seats) || 1;
 
-    entries.push({ date, st, et, b });
+    entries.push({ date, st, et, b, seat });
     dateSet.add(date);
     if (st < minTime) minTime = st;
     if (et > maxTime) maxTime = et;
@@ -386,13 +387,13 @@ function processData(rows, resMins) {
     grid[d] = new Float32Array(numBuckets);
   }
 
-  for (const { date, st, et, b } of entries) {
+  for (const { date, st, et, b, seat } of entries) {
     const arr = grid[date];
     if (!arr) continue;
     const startBucket = Math.max(0, Math.floor((st - minTime) / resMins));
     const endBucket = Math.min(numBuckets, Math.ceil((et - minTime) / resMins));
     for (let i = startBucket; i < endBucket; i++) {
-      arr[i] += b;
+      arr[i] += b * seat;
       if (arr[i] > globalMax) globalMax = arr[i];
     }
   }
