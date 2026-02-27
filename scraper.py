@@ -106,9 +106,8 @@ def query(start_date: str, end_date: str) -> pd.DataFrame:
 
             except Exception as e:
                 print(f"[ERR] {date_str} - {e}")
-
-            current += timedelta(days=1)
             time.sleep(0.5)
+        current += timedelta(days=1)
 
     return pd.DataFrame(all_rows)
 
