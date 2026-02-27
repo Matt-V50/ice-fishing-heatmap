@@ -383,8 +383,11 @@ function processData(rows, resMins) {
   // Build heatmap grid: dates x buckets
   const grid = {};
   let globalMax = 0;
+  let globalMaxBookings = 0;
+  const gridBookings = {};
   for (const d of dates) {
     grid[d] = new Float32Array(numBuckets);
+    gridBookings[d] = new Float32Array(numBuckets);
   }
 
   for (const { date, st, et, b, seat } of entries) {
@@ -395,10 +398,12 @@ function processData(rows, resMins) {
     for (let i = startBucket; i < endBucket; i++) {
       arr[i] += b * seat;
       if (arr[i] > globalMax) globalMax = arr[i];
+      gridBookings[date][i] += b;
+      if (gridBookings[date][i] > globalMaxBookings) globalMaxBookings = gridBookings[date][i];
     }
   }
 
-  return { grid, dates, numBuckets, minTime, maxTime, resMins, globalMax };
+  return { grid, gridBookings, dates, numBuckets, minTime, maxTime, resMins, globalMax, globalMaxBookings };
 }
 
 // ─── Render ───
@@ -411,7 +416,7 @@ function processAndRender() {
 }
 
 function renderStats() {
-  const { dates, globalMax, numBuckets, grid } = heatmapData;
+  const { dates, globalMax, globalMaxBookings, numBuckets, grid } = heatmapData;
   // Find peak
   let peakDate = '', peakTime = 0, peakVal = 0;
   for (const d of dates) {
@@ -431,13 +436,14 @@ function renderStats() {
   document.getElementById('statsBar').innerHTML = `
     <div class="stat-card"><div class="val">${dates.length}</div><div class="lbl">Days</div></div>
     <div class="stat-card"><div class="val">${parsedData.rows.length}</div><div class="lbl">Timeslots</div></div>
-    <div class="stat-card"><div class="val">${globalMax}</div><div class="lbl">Peak Bookings</div></div>
+    <div class="stat-card"><div class="val">${globalMax}</div><div class="lbl">Peak Seats</div></div>
+    <div class="stat-card"><div class="val">${globalMaxBookings}</div><div class="lbl">Peak Bookings</div></div>
     <div class="stat-card"><div class="val">${peakDate}<br>${peakTimeStr}</div><div class="lbl">Busiest</div></div>
   `;
 }
 
 function renderHeatmap() {
-  const { grid, dates, numBuckets, minTime, resMins, globalMax } = heatmapData;
+  const { grid, dates, numBuckets, minTime, resMins, globalMax, gridBookings} = heatmapData;
   const canvas = document.getElementById('heatmap');
   const ctx = canvas.getContext('2d');
 
@@ -533,12 +539,13 @@ function renderHeatmap() {
     if (bi >= 0 && bi < numBuckets && di >= 0 && di < dates.length && mx >= labelW && my >= labelH) {
       const d = dates[di];
       const val = grid[d][bi];
+      const bookings = gridBookings[d][bi];
       const mins = minTime + bi * resMins;
       const minsEnd = mins + resMins;
       const tStr = `${String(Math.floor(mins/60)%24).padStart(2,'0')}:${String(mins%60).padStart(2,'0')}`;
       const tEnd = `${String(Math.floor(minsEnd/60)%24).padStart(2,'0')}:${String(minsEnd%60).padStart(2,'0')}`;
 
-      tooltip.innerHTML = `<div><strong>${d}</strong></div><div>${tStr} – ${tEnd}</div><div>Booked: <strong style="color:#5ec4e6">${val}</strong></div>`;
+      tooltip.innerHTML = `<div><strong>${d}</strong></div><div>${tStr} – ${tEnd}</div><div>Seats: <strong style="color:#5ec4e6">${val}</strong></div><div>Bookings: <strong style="color:#5ec4e6">${bookings}</strong></div>`;
       tooltip.classList.add('show');
       tooltip.style.left = (e.clientX + 14) + 'px';
       tooltip.style.top = (e.clientY - 10) + 'px';
