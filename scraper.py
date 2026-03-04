@@ -140,5 +140,8 @@ if __name__ == "__main__":
     # 按日期和时间排序
     df = df.sort_values(by=["start_date"], ignore_index=True)
     df = df[df["status"] == "A"]
+    df["date"] = pd.to_numeric(df["start_date"], errors="coerce").apply(
+            lambda ts: datetime.fromtimestamp(ts).strftime("%Y-%m-%d") if pd.notna(ts) else None
+        )
     df.to_csv(out_path, index=False)
     print(f"\nDone: {len(df)} rows → {out_path}")
