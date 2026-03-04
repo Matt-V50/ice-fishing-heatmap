@@ -134,9 +134,11 @@ if __name__ == "__main__":
         old_df = old_df[~old_df["date"].between(today, end)]
         old_df = old_df.drop(columns=["date"])
         df = pd.concat([old_df, df.astype(str)], ignore_index=True)
+    else:
+        print("No existing data found, creating new file.")
 
     # 按日期和时间排序
-    df = df.sort_values(by=["start_time"], ignore_index=True)
+    df = df.sort_values(by=["start_date"], ignore_index=True)
     df = df[df["status"] == "A"]
     df.to_csv(out_path, index=False)
     print(f"\nDone: {len(df)} rows → {out_path}")
