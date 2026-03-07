@@ -81,6 +81,7 @@ def query(start_date: str, end_date: str) -> pd.DataFrame:
                 f"&item_id={cfg['item_id']}&discount_code=&ui_date=1&ui_param=1"
             )
             seats = cfg['seats']
+            name = cfg['name']
 
             try:
                 resp = requests.post(url, headers=headers, data=payload, timeout=15)
@@ -99,6 +100,7 @@ def query(start_date: str, end_date: str) -> pd.DataFrame:
                 else:                    
                     for slot in timeslots:
                         slot["seats"] = seats
+                        slot["name"] = name
 
                 all_rows.extend(timeslots)
 
@@ -126,6 +128,7 @@ if __name__ == "__main__":
 
     if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
         old_df = pd.read_csv(out_path, dtype=str)
+        print(f"Existing data rows {len(old_df)} found, merging with new data...")
         # 如果没有 date 列，从 start_date (unix timestamp) 推算
         old_df["date"] = pd.to_numeric(old_df["start_date"], errors="coerce").apply(
             lambda ts: datetime.fromtimestamp(ts).strftime("%Y-%m-%d") if pd.notna(ts) else None
@@ -138,10 +141,10 @@ if __name__ == "__main__":
         print("No existing data found, creating new file.")
 
     # 按日期和时间排序
-    df = df.sort_values(by=["start_date"], ignore_index=True)
     df = df[df["status"] == "A"]
     df["date"] = pd.to_numeric(df["start_date"], errors="coerce").apply(
             lambda ts: datetime.fromtimestamp(ts).strftime("%Y-%m-%d") if pd.notna(ts) else None
         )
+    df = df.sort_values(by=["date", "start_time", "name", "seats"], ignore_index=True)
     df.to_csv(out_path, index=False)
     print(f"\nDone: {len(df)} rows → {out_path}")
